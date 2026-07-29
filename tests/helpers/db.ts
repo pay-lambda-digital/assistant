@@ -9,96 +9,13 @@ function parseDbUrl(): { adminUrl: string; dbName: string } {
   return { adminUrl: admin.toString(), dbName };
 }
 
-// `assistant` doesn't own migrations — `app` does (see app/db/migrations). This mirrors
-// the DDL from 1720000000016-CreateAssistantTables.js and
-// 1720000000017-CreateAssistantAnswerCache.js for just what assistant needs, with the
-// `REFERENCES users(id)` FKs dropped since this test DB doesn't have app's `users` table.
-// Keep in sync with those migrations if the schema changes.
+// Schema creation happens once in tests/helpers/globalSetup.ts (see that file for why —
+// short version: doing it here, per test file, races under `pool: 'forks'`). This just
+// connects this test file's own db singleton — each forked worker is a separate process.
 export async function ensureDb(): Promise<void> {
-  const { adminUrl, dbName } = parseDbUrl();
-  const client = new Client({ connectionString: adminUrl });
-  await client.connect();
-  try {
-    await client.query(`CREATE DATABASE "${dbName}"`);
-  } catch (err) {
-    // 42P04 = duplicate_database — another test run created it first, fine
-    if ((err as { code?: string }).code !== '42P04') throw err;
-  }
-  await client.end();
-
   if (!db.isInitialized) {
     await connectDb();
   }
-
-  await db.query(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`);
-  await db.query(`CREATE EXTENSION IF NOT EXISTS vector`);
-
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS doc_chunks (
-      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-      "sourceFile" VARCHAR NOT NULL,
-      heading VARCHAR,
-      content TEXT NOT NULL,
-      embedding VECTOR(384) NOT NULL,
-      "updatedAt" TIMESTAMP NOT NULL
-    )
-  `);
-  await db.query(`
-    CREATE INDEX IF NOT EXISTS doc_chunks_embedding_idx ON doc_chunks
-    USING hnsw (embedding vector_cosine_ops)
-  `);
-
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS structured_facts (
-      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-      key VARCHAR NOT NULL UNIQUE,
-      data JSONB NOT NULL,
-      "updatedAt" TIMESTAMP NOT NULL
-    )
-  `);
-
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS assistant_conversations (
-      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-      "userId" UUID,
-      "sessionId" VARCHAR,
-      "createdAt" TIMESTAMP NOT NULL
-    )
-  `);
-
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS assistant_messages (
-      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-      "conversationId" UUID NOT NULL REFERENCES assistant_conversations(id) ON DELETE CASCADE,
-      role VARCHAR NOT NULL,
-      content TEXT NOT NULL,
-      "createdAt" TIMESTAMP NOT NULL
-    )
-  `);
-
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS assistant_user_memories (
-      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-      "userId" UUID NOT NULL UNIQUE,
-      summary TEXT NOT NULL,
-      "updatedAt" TIMESTAMP NOT NULL
-    )
-  `);
-
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS assistant_answer_cache (
-      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-      question TEXT NOT NULL,
-      embedding VECTOR(384) NOT NULL,
-      answer TEXT NOT NULL,
-      "hitCount" INT NOT NULL DEFAULT 0,
-      "createdAt" TIMESTAMP NOT NULL
-    )
-  `);
-  await db.query(`
-    CREATE INDEX IF NOT EXISTS assistant_answer_cache_embedding_idx ON assistant_answer_cache
-    USING hnsw (embedding vector_cosine_ops)
-  `);
 }
 
 export async function truncateAll(): Promise<void> {

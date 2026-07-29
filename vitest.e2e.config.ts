@@ -23,6 +23,7 @@ export default defineConfig({
     testTimeout: 20_000,
     hookTimeout: 30_000,
     setupFiles: ['reflect-metadata'],
+    globalSetup: ['./tests/helpers/globalSetup.ts'],
     pool: 'forks',
   },
 });
