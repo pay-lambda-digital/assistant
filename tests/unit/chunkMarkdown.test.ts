@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { chunkMarkdown } from '../../src/ingest';
+import { chunkMarkdown } from '../../src/chunk';
 
 describe('chunkMarkdown', () => {
   it('keeps a short single-section document as one chunk', () => {
