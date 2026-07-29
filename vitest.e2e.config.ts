@@ -25,5 +25,11 @@ export default defineConfig({
     setupFiles: ['reflect-metadata'],
     globalSetup: ['./tests/helpers/globalSetup.ts'],
     pool: 'forks',
+    // Every e2e file shares one physical database, and truncateAll() blanket-clears all
+    // tables per file, not just the ones that file uses — running files concurrently means
+    // one file's cleanup can wipe rows another file just seeded mid-test. Simpler and more
+    // robust to just not run them at the same time than to make truncation surgically
+    // scoped per file (fragile — breaks again the next time a file forgets the constraint).
+    fileParallelism: false,
   },
 });
