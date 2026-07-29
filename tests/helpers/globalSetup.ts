@@ -1,4 +1,5 @@
 import { Client } from 'pg';
+import { embed } from '../../src/embed';
 
 function parseDbUrl(): { adminUrl: string; dbName: string } {
   const url = new URL(process.env.DATABASE_URL!);
@@ -9,11 +10,12 @@ function parseDbUrl(): { adminUrl: string; dbName: string } {
 }
 
 // Runs once, in a single process, before any test file's worker starts — this is what
-// makes schema creation race-free. With `pool: 'forks'`, each test file runs in its own
-// process; if schema creation lived in each file's own beforeAll instead, concurrent
-// `CREATE TABLE IF NOT EXISTS` calls could race on the table's implicit row type in
-// pg_type (IF NOT EXISTS' check-then-create isn't atomic under concurrency). Test files'
-// own beforeAll (see ensureDb in tests/helpers/db.ts) only connects, never creates.
+// makes schema creation (and the embedding-model download below) race-free. With
+// `pool: 'forks'`, each test file runs in its own process; if schema creation lived in
+// each file's own beforeAll instead, concurrent `CREATE TABLE IF NOT EXISTS` calls could
+// race on the table's implicit row type in pg_type (IF NOT EXISTS' check-then-create
+// isn't atomic under concurrency). Test files' own beforeAll (see ensureDb in
+// tests/helpers/db.ts) only connects, never creates.
 //
 // `assistant` doesn't own migrations (app does) — this mirrors the DDL from
 // app/db/migrations/1720000000016-CreateAssistantTables.js and
@@ -21,6 +23,13 @@ function parseDbUrl(): { adminUrl: string; dbName: string } {
 // `REFERENCES users(id)` FKs dropped since this test DB doesn't have app's users table.
 // Keep in sync with those migrations if the schema changes.
 export default async function setup(): Promise<void> {
+  // Pre-warm the embedding model into node_modules' shared on-disk cache before any test
+  // file's worker starts. Same reasoning as the schema race above: without this, multiple
+  // worker processes cold-starting embed() at once can concurrently write the same cache
+  // file and corrupt each other's download ("Protobuf parsing failed" on whichever process
+  // loses the race). The production Dockerfile pre-warms the same way at image build time.
+  await embed('warm up the embedding model cache');
+
   const { adminUrl, dbName } = parseDbUrl();
   const admin = new Client({ connectionString: adminUrl });
   await admin.connect();
