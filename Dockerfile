@@ -8,7 +8,6 @@ WORKDIR /app
 
 COPY package*.json .npmrc ./
 RUN --mount=type=secret,id=entities_read_token \
-    ls -la /run/secrets/ && (wc -c < /run/secrets/entities_read_token || echo "FILE MISSING") && \
     echo "//npm.pkg.github.com/:_authToken=$(cat /run/secrets/entities_read_token)" >> .npmrc && \
     npm ci && \
     rm -f .npmrc
@@ -21,7 +20,6 @@ WORKDIR /app
 
 COPY package*.json .npmrc ./
 RUN --mount=type=secret,id=entities_read_token \
-    ls -la /run/secrets/ && (wc -c < /run/secrets/entities_read_token || echo "FILE MISSING") && \
     echo "//npm.pkg.github.com/:_authToken=$(cat /run/secrets/entities_read_token)" >> .npmrc && \
     npm ci --omit=dev && \
     rm -f .npmrc
