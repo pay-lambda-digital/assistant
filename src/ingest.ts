@@ -11,14 +11,14 @@ const MAX_WORDS_PER_CHUNK = 400; // ~500 tokens, rough word-based approximation
 const OVERLAP_WORDS = 50;
 
 interface Chunk {
-  heading: string | null;
+  heading: string | undefined;
   content: string;
 }
 
 // Splits on level-2 headings first (each section = one topic), then further splits any
 // section that's still too long, with a word-overlap so a fact split across the boundary
 // isn't lost to either chunk.
-function chunkMarkdown(markdown: string): Chunk[] {
+export function chunkMarkdown(markdown: string): Chunk[] {
   const sections = markdown.split(/\n(?=## )/g);
   const chunks: Chunk[] = [];
 
@@ -27,7 +27,7 @@ function chunkMarkdown(markdown: string): Chunk[] {
     if (!trimmed) continue;
 
     const headingMatch = trimmed.match(/^##\s+(.+)/);
-    const heading = headingMatch ? headingMatch[1].trim() : null;
+    const heading = headingMatch ? headingMatch[1].trim() : undefined;
     const words = trimmed.split(/\s+/);
 
     if (words.length <= MAX_WORDS_PER_CHUNK) {
@@ -79,7 +79,8 @@ async function ingestStructuredFacts(): Promise<void> {
   const upsert = async (key: string, data: Record<string, unknown>): Promise<void> => {
     const existing = await factRepo.findOneBy({ key });
     if (existing) {
-      await factRepo.update(existing.id, { data });
+      existing.data = data;
+      await factRepo.save(existing);
     } else {
       await factRepo.save(factRepo.create({ key, data }));
     }
@@ -107,7 +108,11 @@ async function main(): Promise<void> {
   console.log('[ingest] done');
 }
 
-main().catch((err) => {
-  console.error('[ingest] failed:', err);
-  process.exit(1);
-});
+// Guarded so importing chunkMarkdown (e.g. from a unit test) doesn't trigger a full,
+// DB-connecting ingest run as a side effect of the import.
+if (require.main === module) {
+  main().catch((err) => {
+    console.error('[ingest] failed:', err);
+    process.exit(1);
+  });
+}

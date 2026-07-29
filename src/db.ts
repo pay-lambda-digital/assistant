@@ -3,6 +3,7 @@ import { DataSource } from 'typeorm';
 import {
   DocChunk,
   StructuredFact,
+  AssistantAnswerCache,
   AssistantConversation,
   AssistantMessage,
   AssistantUserMemory,
@@ -12,7 +13,14 @@ import { config } from './config';
 export const db = new DataSource({
   type: 'postgres',
   url: config.databaseUrl,
-  entities: [DocChunk, StructuredFact, AssistantConversation, AssistantMessage, AssistantUserMemory],
+  entities: [
+    DocChunk,
+    StructuredFact,
+    AssistantAnswerCache,
+    AssistantConversation,
+    AssistantMessage,
+    AssistantUserMemory,
+  ],
   synchronize: false,
   logging: false,
 });

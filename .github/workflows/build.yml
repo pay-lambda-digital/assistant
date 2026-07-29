@@ -28,8 +28,62 @@ jobs:
       - name: Type-check
         run: npx tsc --noEmit
 
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: myuser
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: assistant_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://npm.pkg.github.com
+          scope: '@pay-lambda-digital'
+
+      - name: Install
+        run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.ENTITIES_READ_TOKEN }}
+
+      - name: Unit tests
+        run: npm test
+
+      - name: E2E tests
+        run: npm run test:e2e
+        env:
+          DATABASE_URL: postgresql://myuser:password@localhost:5432/assistant_test
+          REDIS_URL: redis://localhost:6379
+
   build:
-    needs: typecheck
+    needs: [typecheck, test]
     runs-on: ubuntu-latest
     permissions:
       contents: read
