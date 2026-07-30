@@ -57,13 +57,6 @@ export async function runTool(call: ToolCall): Promise<string> {
       const query = String(call.arguments.query ?? '');
       const all = await searchDocs(query, 5);
       const results = all.filter((r) => r.distance <= SEARCH_RELEVANCE_THRESHOLD);
-      // TEMP DEBUG — remove once the relevance threshold is confirmed correct.
-      console.log(
-        `[search_docs] query="${query}"\n` +
-          all
-            .map((r) => `  ${r.distance.toFixed(3)}  ${r.sourceFile} / ${r.heading ?? '(no heading)'}`)
-            .join('\n'),
-      );
       if (results.length === 0) {
         return JSON.stringify({ found: false, message: 'No relevant documentation found for this query.' });
       }

@@ -51,6 +51,10 @@ interface ChatRequestBody {
   message: string;
 }
 
+// Well above any real question, short enough to keep a single request's embedding +
+// tool-round + retry cost bounded.
+const MAX_MESSAGE_LENGTH = 2000;
+
 // Anonymous-only for now — Phase 2 in ASSISTANT_PLAN.md. Signed-in resolution (Phase 3)
 // needs a verified identity forwarded from app's NextAuth session, not a client-supplied
 // userId — don't trust a body/query userId here, that's an auth bypass waiting to happen.
@@ -59,6 +63,9 @@ export const chatRoute: FastifyPluginAsync = async (fastify) => {
     const { message } = request.body ?? {};
     if (!message || typeof message !== 'string') {
       return reply.code(400).send({ error: 'message is required' });
+    }
+    if (message.length > MAX_MESSAGE_LENGTH) {
+      return reply.code(400).send({ error: `message must be under ${MAX_MESSAGE_LENGTH} characters` });
     }
 
     let sessionId = request.cookies?.[SESSION_COOKIE];
@@ -88,7 +95,10 @@ export const chatRoute: FastifyPluginAsync = async (fastify) => {
     }
 
     try {
-      await chatRateLimiter.consume(sessionId);
+      // Keyed by IP, not sessionId — sessionId comes straight from a client-supplied
+      // cookie (see above), so a request that just omits the cookie gets a fresh random
+      // session every time and would otherwise never accumulate against any limit.
+      await chatRateLimiter.consume(request.ip);
     } catch {
       return reply.code(429).send({ error: 'Too many requests — try again in a minute.' });
     }
@@ -98,8 +108,6 @@ export const chatRoute: FastifyPluginAsync = async (fastify) => {
     // in this session, the same words can mean something different depending on what
     // came before, so skip it entirely rather than risk an out-of-context cached answer.
     const isFreshSession = history.length === 0;
-    // TEMP DEBUG — remove once session persistence is confirmed working.
-    console.log(`[chat] sessionId=${sessionId} cookieWasSet=${!!setCookieHeader} history.length=${history.length}`);
 
     // This route streams via reply.raw directly (writeHead/write/end) rather than
     // reply.send(), so it never runs Fastify's normal response lifecycle — @fastify/cors's

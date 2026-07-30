@@ -80,11 +80,6 @@ export const groqProvider: AssistantProvider = {
 
       const responseMessage = completion.choices[0]?.message;
       const toolCalls = responseMessage?.tool_calls;
-      // TEMP DEBUG — remove once tool selection with the new model is confirmed working.
-      console.log(
-        `[groq] round ${round}: tool_calls=${toolCalls?.map((c) => c.function.name).join(',') || 'none'}`,
-        toolCalls ? '' : `content="${responseMessage?.content?.slice(0, 200)}"`,
-      );
       if (!responseMessage || !toolCalls || toolCalls.length === 0) {
         // The model already gave its final answer right here — use it directly. This used
         // to be discarded in favor of a second, independent streamed call, which silently

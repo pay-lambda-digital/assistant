@@ -9,7 +9,11 @@ import { chatRoute } from './routes/chat';
 async function main(): Promise<void> {
   await connectDb();
 
-  const fastify = Fastify({ logger: true });
+  // Production sits behind nginx (see ASSISTANT_PLAN.md) — without trustProxy, every
+  // request's request.ip would be nginx's own address, not the real visitor's, collapsing
+  // IP-based rate limiting (see routes/chat.ts) into one shared global bucket instead of
+  // per-visitor.
+  const fastify = Fastify({ logger: true, trustProxy: true });
   await fastify.register(cookie);
   if (process.env.NODE_ENV !== 'production') {
     // In production this is same-origin, routed by nginx (see ASSISTANT_PLAN.md) — no
