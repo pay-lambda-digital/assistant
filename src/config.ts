@@ -11,9 +11,18 @@ export const config = {
   databaseUrl: required('DATABASE_URL'),
   redisUrl: required('REDIS_URL'),
 
+  // Which AssistantProvider (src/llm/) handles chat — see src/llm/index.ts for the
+  // registry this selects from.
+  llmProvider: process.env.LLM_PROVIDER ?? 'groq',
+
   groq: {
     apiKey: required('GROQ_API_KEY'),
-    model: process.env.GROQ_MODEL ?? 'llama-3.3-70b-versatile',
+    // gpt-oss, not llama-3.3-70b-versatile: the latter is a well-documented, ongoing
+    // (reports through Apr 2026) source of malformed <function=name{args}> tool-call
+    // generations on Groq — it's a third-party fine-tune not natively trained on the
+    // OpenAI-style tool-call format Groq's API validates against. gpt-oss is OpenAI's
+    // own open-weight model, trained on that exact format, and free-tier on Groq.
+    model: process.env.GROQ_MODEL ?? 'openai/gpt-oss-20b',
   },
 
   chatRateLimit: {

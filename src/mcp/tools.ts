@@ -42,13 +42,28 @@ async function getStructuredFact(key: string): Promise<unknown> {
 // actually relevant (e.g. "what is your name" still returns *something*). Without a
 // cutoff, the model gets handed unrelated chunks framed as if they were relevant context
 // — cut them here so an honest "nothing found" signal reaches the model instead.
-const SEARCH_RELEVANCE_THRESHOLD = 0.25;
+//
+// 0.25 was an untested guess and was rejecting genuinely correct matches: querying
+// "webhooks" against the real KB returns webhooks.md's own intro chunk at 0.382 as the
+// top hit (see [search_docs] debug logging) — all-MiniLM-L6-v2 cosine distances for
+// short queries against markdown passages just run higher than that. Recalibrated to
+// 0.6 from that real sample; re-check with an off-topic query (e.g. "capital of France")
+// to confirm it still rejects genuinely unrelated content before removing this comment.
+const SEARCH_RELEVANCE_THRESHOLD = 0.6;
 
 export async function runTool(call: ToolCall): Promise<string> {
   switch (call.name) {
     case 'search_docs': {
       const query = String(call.arguments.query ?? '');
-      const results = (await searchDocs(query, 5)).filter((r) => r.distance <= SEARCH_RELEVANCE_THRESHOLD);
+      const all = await searchDocs(query, 5);
+      const results = all.filter((r) => r.distance <= SEARCH_RELEVANCE_THRESHOLD);
+      // TEMP DEBUG — remove once the relevance threshold is confirmed correct.
+      console.log(
+        `[search_docs] query="${query}"\n` +
+          all
+            .map((r) => `  ${r.distance.toFixed(3)}  ${r.sourceFile} / ${r.heading ?? '(no heading)'}`)
+            .join('\n'),
+      );
       if (results.length === 0) {
         return JSON.stringify({ found: false, message: 'No relevant documentation found for this query.' });
       }
