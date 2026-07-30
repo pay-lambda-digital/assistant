@@ -69,3 +69,4 @@ own `##` heading (see `faq.md`); it's fine for a genuinely single-topic doc (lik
 - [Security](content/kb/security.md)
 - [Subscription Billing](content/kb/subscription-billing.md)
 - [FAQ](content/kb/faq.md)
+- [Legal & Compliance Policies](content/kb/legal-policies.md)
